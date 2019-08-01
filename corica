@@ -1,0 +1,90 @@
+#!/bin/bash
+
+backtrace() {
+    gdb -q -ex 'bt full' --batch -c $1
+}
+
+libs() {
+    local files=$(gdb -q -ex 'i sh' --batch -c $1 | sed -ne 's/^0x.*[[:space:]]\(\/.*\)/\1/p')
+    for f in $files; do
+        realpath -q $f
+    done;
+}
+
+act_libs() {
+    read -r -d '' usage <<EOF
+usage: $0 libs [options] <coredump>
+print loaded libraries from coredump
+
+options:
+  -h    help
+EOF
+
+    while getopts h opt; do
+        case $opt in
+            h) echo "$usage"; exit 0;;
+            ?) exit 1;;
+        esac
+    done
+    if [ "$#" != "1" ]; then
+        echo "$usage"; exit 0
+    fi
+
+    libs $1
+}
+
+act_pack() {
+    echo $@
+}
+
+act_backtrace() {
+    read -r -d '' usage <<EOF
+usage: $0 backtrace [options] <coredump>
+print coredump backtrace
+
+alias: bt
+
+options:
+  -h    help
+EOF
+
+    while getopts h opt; do
+        case $opt in
+            h) echo "$usage"; exit 0;;
+            ?) exit 1;;
+        esac
+    done
+    if [ "$#" != "1" ]; then
+        echo "$usage"; exit 0
+    fi
+
+    backtrace $1
+}
+
+read -r -d '' usage <<EOF
+usage: $0 [options] <action>
+tool for coredump manipulations
+
+actions:
+  backtrace     print coredump backtrace
+  libs          print list of libs from coredump
+  pack          pack coredump and libs
+
+options:
+  -h    help
+EOF
+
+while getopts ':h' opt; do
+    case $opt in
+        h) echo "$usage"; exit 0;;
+        ?) echo error: unknown option \'-$OPTARG\'; exit 1;;
+    esac
+done
+
+action=$1; shift
+case $action in
+    backtrace | bt) act_backtrace $@;;
+    pack) act_pack $@;;
+    libs) act_libs $@;;
+    *) echo error: unknown action;;
+esac
